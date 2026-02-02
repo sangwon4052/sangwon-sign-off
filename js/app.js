@@ -438,11 +438,22 @@ async function loadMyRequests() {
             return;
         }
         
+        // 최신순으로 정렬
+        myApprovals.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        
         listEl.innerHTML = myApprovals.map(approval => `
             <div class="user-card">
                 <div>
                     <h4>${approval.title}</h4>
                     <p>${approval.description}</p>
+                    <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">
+                        <i class="far fa-clock"></i> 신청일: ${new Date(approval.createdAt).toLocaleString('ko-KR')}
+                    </p>
+                    ${approval.processedAt ? `
+                        <p style="font-size: 13px; color: var(--text-secondary); margin-top: 2px;">
+                            <i class="far fa-check-circle"></i> 처리일: ${new Date(approval.processedAt).toLocaleString('ko-KR')}
+                        </p>
+                    ` : ''}
                     <span class="badge badge-${approval.status}">${getStatusText(approval.status)}</span>
                 </div>
                 <div class="user-actions">
@@ -645,11 +656,20 @@ async function loadApprovalHistory() {
             return;
         }
         
+        // 처리일 기준 최신순 정렬
+        history.sort((a, b) => new Date(b.processedAt) - new Date(a.processedAt));
+        
         listEl.innerHTML = history.map(approval => `
             <div class="user-card">
                 <div>
                     <h4>${approval.title}</h4>
                     <p>신청자: ${approval.requesterName}</p>
+                    <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">
+                        <i class="far fa-clock"></i> 신청일: ${new Date(approval.createdAt).toLocaleString('ko-KR')}
+                    </p>
+                    <p style="font-size: 13px; color: var(--text-secondary); margin-top: 2px;">
+                        <i class="far fa-check-circle"></i> 처리일: ${new Date(approval.processedAt).toLocaleString('ko-KR')}
+                    </p>
                     <span class="badge badge-${approval.status}">${getStatusText(approval.status)}</span>
                 </div>
                 <div class="user-actions">
