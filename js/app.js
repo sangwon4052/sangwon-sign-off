@@ -606,14 +606,18 @@ async function loadPendingApprovals() {
                 <div>
                     <h4>${approval.title}</h4>
                     <p>신청자: ${approval.requesterName}</p>
-                    <p style="font-size: 13px; color: var(--text-secondary);">${new Date(approval.createdAt).toLocaleString('ko-KR')}</p>
+                    <p style="font-size: 13px; color: var(--text-secondary);">
+                        <i class="far fa-clock"></i> ${new Date(approval.createdAt).toLocaleString('ko-KR')}
+                    </p>
+                    ${approval.files && approval.files.length > 0 ? `
+                        <p style="font-size: 13px; color: var(--primary); margin-top: 4px;">
+                            <i class="fas fa-paperclip"></i> 첨부파일 ${approval.files.length}개
+                        </p>
+                    ` : ''}
                 </div>
                 <div class="user-actions">
-                    <button class="btn btn-sm btn-success" onclick="window.processApproval('${approval.id}', 'approved')">
-                        <i class="fas fa-check"></i> 승인
-                    </button>
-                    <button class="btn btn-sm btn-danger" onclick="window.processApproval('${approval.id}', 'rejected')">
-                        <i class="fas fa-times"></i> 반려
+                    <button class="btn btn-sm btn-primary" onclick="window.viewApprovalDetail('${approval.id}')">
+                        <i class="fas fa-eye"></i> 상세보기
                     </button>
                 </div>
             </div>
@@ -821,7 +825,58 @@ function closeApprovalModal() {
 
 // 모달에서 결재 처리
 async function processApprovalFromModal(approvalId, status) {
-    await processApproval(approvalId, status);
+    if (status === 'rejected') {
+        // 반려 시 피드백 입력 받기
+        showFeedbackModal(approvalId);
+    } else {
+        // 승인 시 바로 처리
+        if (!confirm('정말 승인하시겠습니까?')) return;
+        await processApproval(approvalId, 'approved', '');
+        closeApprovalModal();
+    }
+}
+
+// 피드백 모달 표시
+function showFeedbackModal(approvalId) {
+    const approvalModal = document.getElementById('approvalModal');
+    const modalBody = document.getElementById('approvalModalBody');
+    
+    modalBody.innerHTML = `
+        <div class="detail-section">
+            <h3><i class="fas fa-comment-dots"></i> 반려 사유 입력</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 16px;">
+                신청자에게 전달할 반려 사유를 입력해주세요.
+            </p>
+            <textarea 
+                id="feedbackText" 
+                rows="6" 
+                placeholder="반려 사유를 입력하세요..."
+                style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-family: 'Noto Sans KR', sans-serif; font-size: 14px;"
+            ></textarea>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-danger" onclick="submitRejection('${approvalId}')">
+                <i class="fas fa-paper-plane"></i> 반려 완료
+            </button>
+            <button class="btn btn-secondary" onclick="window.viewApprovalDetail('${approvalId}')">
+                <i class="fas fa-arrow-left"></i> 돌아가기
+            </button>
+        </div>
+    `;
+}
+
+// 반려 제출
+async function submitRejection(approvalId) {
+    const feedback = document.getElementById('feedbackText').value.trim();
+    
+    if (!feedback) {
+        showToast('반려 사유를 입력해주세요', 'warning');
+        return;
+    }
+    
+    if (!confirm('입력한 내용으로 반려하시겠습니까?')) return;
+    
+    await processApproval(approvalId, 'rejected', feedback);
     closeApprovalModal();
 }
 
@@ -836,17 +891,17 @@ function downloadFile(fileData, fileName) {
 }
 
 // ===== 결재 처리 =====
-async function processApproval(approvalId, status) {
-    if (!confirm(`정말 ${status === 'approved' ? '승인' : '반려'}하시겠습니까?`)) return;
-    
+async function processApproval(approvalId, status, feedback = '') {
     try {
         await DB.update('approvals', approvalId, {
             status,
+            feedback,
             processedAt: new Date().toISOString(),
             processedBy: currentUser.id
         });
         
-        showToast(`결재가 ${status === 'approved' ? '승인' : '반려'}되었습니다`, 'success');
+        const statusText = status === 'approved' ? '승인' : '반려';
+        showToast(`결재가 ${statusText}되었습니다`, 'success');
         loadPageData(currentPage);
         
     } catch (error) {
@@ -1132,6 +1187,8 @@ function stopAutoRefresh() {
 window.viewApprovalDetail = viewApprovalDetail;
 window.closeApprovalModal = closeApprovalModal;
 window.processApprovalFromModal = processApprovalFromModal;
+window.showFeedbackModal = showFeedbackModal;
+window.submitRejection = submitRejection;
 window.downloadFile = downloadFile;
 window.processApproval = processApproval;
 window.deleteEmployee = deleteEmployee;
