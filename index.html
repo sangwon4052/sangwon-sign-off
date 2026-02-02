@@ -292,6 +292,19 @@
     <!-- 토스트 알림 -->
     <div id="toast" class="toast"></div>
 
+    <!-- 결재 상세보기 모달 -->
+    <div id="approvalModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-file-alt"></i> 결재 상세보기</h2>
+                <button class="modal-close" onclick="closeApprovalModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="approvalModalBody">
+                <!-- 동적 콘텐츠 -->
+            </div>
+        </div>
+    </div>
+
     <!-- Firebase SDK v9 (modular) -->
     <script type="module">
         // Firebase 설정

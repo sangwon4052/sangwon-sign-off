@@ -662,15 +662,177 @@ async function loadApprovalHistory() {
     }
 }
 
-// ===== 결재 상세보기 (간단 버전) =====
+// ===== 결재 상세보기 =====
 async function viewApprovalDetail(approvalId) {
     try {
         const approval = await DB.getById('approvals', approvalId);
-        alert(`제목: ${approval.title}\n신청자: ${approval.requesterName}\n상태: ${getStatusText(approval.status)}\n내용: ${approval.description}`);
+        const modal = document.getElementById('approvalModal');
+        const modalBody = document.getElementById('approvalModalBody');
+        
+        if (!approval) {
+            showToast('결재 정보를 찾을 수 없습니다', 'error');
+            return;
+        }
+        
+        // 파일 목록 HTML
+        let filesHtml = '';
+        if (approval.files && approval.files.length > 0) {
+            filesHtml = `
+                <div class="detail-section">
+                    <h3><i class="fas fa-paperclip"></i> 첨부 파일 (${approval.files.length}개)</h3>
+                    <div class="files-list">
+                        ${approval.files.map((file, index) => `
+                            <div class="file-download-item">
+                                <div class="file-download-info">
+                                    <i class="fas fa-file-alt"></i>
+                                    <div>
+                                        <div class="file-name">${file.fileName}</div>
+                                    </div>
+                                </div>
+                                <button class="btn btn-sm btn-primary" onclick="downloadFile('${file.fileData}', '${file.fileName}')">
+                                    <i class="fas fa-download"></i> 다운로드
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        } else {
+            filesHtml = '<div class="detail-section"><p style="color: var(--text-secondary);">첨부 파일이 없습니다.</p></div>';
+        }
+        
+        // 사인 파일 목록 HTML
+        let signedFilesHtml = '';
+        if (approval.signedFiles && approval.signedFiles.length > 0) {
+            signedFilesHtml = `
+                <div class="detail-section">
+                    <h3><i class="fas fa-file-signature"></i> 사인된 파일 (${approval.signedFiles.length}개)</h3>
+                    <div class="files-list">
+                        ${approval.signedFiles.map((file, index) => `
+                            <div class="file-download-item">
+                                <div class="file-download-info">
+                                    <i class="fas fa-file-signature"></i>
+                                    <div>
+                                        <div class="file-name">${file.fileName}</div>
+                                    </div>
+                                </div>
+                                <button class="btn btn-sm btn-success" onclick="downloadFile('${file.fileData}', '${file.fileName}')">
+                                    <i class="fas fa-download"></i> 다운로드
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // 처리 버튼 (결재자이고 pending 상태일 때만)
+        let actionsHtml = '';
+        if (approval.assignedApproverId === currentUser.id && approval.status === 'pending') {
+            actionsHtml = `
+                <div class="modal-actions">
+                    <button class="btn btn-success" onclick="processApprovalFromModal('${approval.id}', 'approved')">
+                        <i class="fas fa-check"></i> 승인
+                    </button>
+                    <button class="btn btn-danger" onclick="processApprovalFromModal('${approval.id}', 'rejected')">
+                        <i class="fas fa-times"></i> 반려
+                    </button>
+                    <button class="btn btn-secondary" onclick="closeApprovalModal()">
+                        <i class="fas fa-arrow-left"></i> 닫기
+                    </button>
+                </div>
+            `;
+        } else {
+            actionsHtml = `
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="closeApprovalModal()">
+                        <i class="fas fa-times"></i> 닫기
+                    </button>
+                </div>
+            `;
+        }
+        
+        // 모달 내용 구성
+        modalBody.innerHTML = `
+            <div class="detail-section">
+                <h3><i class="fas fa-info-circle"></i> 기본 정보</h3>
+                <div class="detail-item">
+                    <div class="detail-label">제목</div>
+                    <div class="detail-value">${approval.title}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">신청자</div>
+                    <div class="detail-value">${approval.requesterName}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">담당 결재자</div>
+                    <div class="detail-value">${approval.assignedApproverName}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">상태</div>
+                    <div class="detail-value">
+                        <span class="badge badge-${approval.status}">${getStatusText(approval.status)}</span>
+                    </div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">신청일시</div>
+                    <div class="detail-value">${new Date(approval.createdAt).toLocaleString('ko-KR')}</div>
+                </div>
+                ${approval.processedAt ? `
+                    <div class="detail-item">
+                        <div class="detail-label">처리일시</div>
+                        <div class="detail-value">${new Date(approval.processedAt).toLocaleString('ko-KR')}</div>
+                    </div>
+                ` : ''}
+            </div>
+            
+            <div class="detail-section">
+                <h3><i class="fas fa-align-left"></i> 내용</h3>
+                <div class="detail-value" style="white-space: pre-wrap;">${approval.description}</div>
+            </div>
+            
+            ${filesHtml}
+            ${signedFilesHtml}
+            
+            ${approval.feedback ? `
+                <div class="detail-section">
+                    <h3><i class="fas fa-comment"></i> 피드백</h3>
+                    <div class="detail-value" style="white-space: pre-wrap;">${approval.feedback}</div>
+                </div>
+            ` : ''}
+            
+            ${actionsHtml}
+        `;
+        
+        // 모달 표시
+        modal.style.display = 'flex';
+        
     } catch (error) {
         console.error('❌ 결재 상세 로드 오류:', error);
         showToast('결재 정보를 불러오는 중 오류가 발생했습니다', 'error');
     }
+}
+
+// 모달 닫기
+function closeApprovalModal() {
+    const modal = document.getElementById('approvalModal');
+    if (modal) modal.style.display = 'none';
+}
+
+// 모달에서 결재 처리
+async function processApprovalFromModal(approvalId, status) {
+    await processApproval(approvalId, status);
+    closeApprovalModal();
+}
+
+// 파일 다운로드
+function downloadFile(fileData, fileName) {
+    const link = document.createElement('a');
+    link.href = fileData;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 
 // ===== 결재 처리 =====
@@ -968,6 +1130,9 @@ function stopAutoRefresh() {
 
 // ===== 전역 함수 노출 (onclick 이벤트용) =====
 window.viewApprovalDetail = viewApprovalDetail;
+window.closeApprovalModal = closeApprovalModal;
+window.processApprovalFromModal = processApprovalFromModal;
+window.downloadFile = downloadFile;
 window.processApproval = processApproval;
 window.deleteEmployee = deleteEmployee;
 window.approveUser = approveUser;
